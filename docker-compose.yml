@@ -1,0 +1,138 @@
+version: "3.4"
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 50m
+      max-file: "20"
+      tag: '{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}'
+
+services:
+  nethermind:
+    container_name: nethermind
+    image: nethermind/nethermind:${NETHERMIND_VERSION:-latest}
+    restart: "${RESTART:-unless-stopped}"
+    ports:
+      - ${NETHERMIND_PORT_P2P:-30303}:${NETHERMIND_PORT_P2P:-30303}/tcp # P2P TCP
+      - ${NETHERMIND_PORT_P2P:-30303}:${NETHERMIND_PORT_P2P:-30303}/udp # P2P UDP
+    command: |
+      --config=${NETWORK:-holesky}
+      --datadir=data
+      --JsonRpc.Enabled=true
+      --JsonRpc.JwtSecretFile="/root/jwt/jwt.hex"
+      --JsonRpc.EngineHost=0.0.0.0
+      --JsonRpc.EnginePort=8551
+      --JsonRpc.Host=0.0.0.0
+      --JsonRpc.Port=8545
+      --Sync.SnapSync=true
+      --Network.DiscoveryPort=${NETHERMIND_PORT_P2P:-30303}
+      --Network.P2PPort=${NETHERMIND_PORT_P2P:-30303}
+      --HealthChecks.Enabled=true
+      --Metrics.Enabled=true
+      --Metrics.ExposePort=8008
+    networks: 
+      - net
+    volumes:
+      - ./data/nethermind:/nethermind/data
+      - ./jwt:/root/jwt
+    <<: *logging
+
+  lighthouse:
+    container_name: lighthouse
+    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-latest}
+    restart: "${RESTART:-unless-stopped}"
+    ports:
+      - ${LIGHTHOUSE_PORT_P2P:-9000}:${LIGHTHOUSE_PORT_P2P:-9000}/tcp   # P2P TCP
+      - ${LIGHTHOUSE_PORT_P2P:-9000}:${LIGHTHOUSE_PORT_P2P:-9000}/udp   # P2P UDP
+    command: |
+      lighthouse bn
+      --port=${LIGHTHOUSE_PORT_P2P:-9000}
+      --network=${NETWORK:-holesky}
+      --checkpoint-sync-url=${LIGHTHOUSE_CHECKPOINT_SYNC_URL:-https://checkpoint-sync.holesky.ethpandaops.io}
+      --execution-endpoint=http://nethermind:8551
+      --execution-jwt=/opt/jwt/jwt.hex
+      --datadir=/opt/app/beacon/
+      --builder=http://mev-boost:18550
+      --http
+      --http-address=0.0.0.0
+      --http-port=5052
+      --metrics
+      --metrics-address=0.0.0.0
+      --metrics-port=5054
+      --metrics-allow-origin="*"
+    networks:
+      - net
+    volumes:
+      - ./data/lighthouse:/opt/app/beacon
+      - ./jwt:/opt/jwt
+    <<: *logging
+  
+  mev-boost:
+    container_name: mev-boost
+    restart: "${RESTART:-unless-stopped}"
+    image: flashbots/mev-boost:${MEVBOOST_VERSION:-latest}
+    networks:
+      - net
+    command: |
+      -${NETWORK:-holesky} 
+      -loglevel=debug
+      -addr=0.0.0.0:18550
+      -relay-check
+      -relays=${MEVBOOST_RELAYS:-"https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-holesky.flashbots.net,https://0xaa58208899c6105603b74396734a6263cc7d947f444f396a90f7b7d3e65d102aec7e5e5291b27e08d02c50a050825c2f@holesky.titanrelay.xyz"}
+    <<: *logging
+
+  ssv-node:
+    container_name: ssv-node
+    image: bloxstaking/ssv-node:${SSV_NODE_VERSION_TAG:-latest}
+    restart: "${RESTART:-unless-stopped}"
+    command: |
+      make BUILD_PATH=/go/bin/ssvnode start-node
+    volumes:
+      - ./config/config.yaml:/config.yaml
+      - ./secrets/password:/password
+      - ./secrets/encrypted_private_key.json:/encrypted_private_key.json
+      - /etc/localtime:/etc/localtime:ro
+      - ssv-data:/data
+    ports:
+      - ${SSV_P2P_PORT:-12001}:${SSV_P2P_PORT:-12001}/tcp
+      - ${SSV_P2P_PORT_UDP:-12001}:${SSV_P2P_PORT_UDP:-12001}/udp
+    networks:
+      - net
+    <<: *logging
+    environment:
+      - CONFIG_PATH=/config.yaml
+
+  prometheus:
+    container_name: prometheus
+    restart: "${RESTART:-unless-stopped}"
+    image: prom/prometheus:${RPOMETHEUS_VERSION_TAG:-latest}
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - net
+    <<: *logging
+
+  grafana:
+    container_name: grafana
+    restart: "${RESTART:-unless-stopped}"
+    image: grafana/grafana:${GRAFANA_VERSION:-10.0.3}
+    user: ":"
+    ports:
+      - ${MONITORING_PORT_GRAFANA:-3000}:3000
+    networks:
+      - net
+    volumes:
+      - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/datasource.yml
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/dashboards:/etc/dashboards
+      - ./data/grafana:/var/lib/grafana
+    <<: *logging
+
+volumes:
+  ssv-data:
+networks:
+  net:
+    name: ssv
+    driver: bridge
+

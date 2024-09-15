@@ -1,0 +1,23 @@
+global:
+  scrape_interval:     10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: ssv
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+        # change the targets according to your setup
+        # if running prometheus from source, or as executable:
+        # - <container_name>:15000 (i.e.: ssv_node:15000, check with docker ps command)
+        # if running prometheus as docker container:
+        - ssv-node:15000
+  - job_name: ssv_health
+    metrics_path: /health
+    static_configs:
+      - targets:
+        # change the targets according to your setup
+        # if running prometheus from source, or as executable:
+        # - <container_name>:15000 (i.e.: ssv_node:15000, check with docker ps command)
+        # if running prometheus as docker container:
+        - ssv-node:15000
