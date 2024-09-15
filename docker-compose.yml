@@ -1,4 +1,3 @@
-version: "3.4"
 x-logging: &logging
   logging:
     driver: json-file
@@ -133,6 +132,6 @@ volumes:
   ssv-data:
 networks:
   net:
-    name: ssv
+    name: ssv-net
     driver: bridge
 
