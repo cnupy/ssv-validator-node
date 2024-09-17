@@ -1,2 +1,5 @@
 .env
 secrets
+dkg-log
+dkg-output
+ssv-log

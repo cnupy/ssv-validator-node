@@ -3,43 +3,7 @@ global:
   LogLevel: info
   
   # Debug logs file path
-  LogFilePath: ./data/debug.log
-  LogFileBackups: 28
-db:
-  # Path to a persistent directory to store the node's database.
-  Path: ./data/db
+  LogFilePath: /log/debug.log
 
-ssv:
-  # The SSV network to join to
-  # Mainnet = Network: mainnet (default)
-  # Testnet (Goerli)  = Network: jato-v2
-  # Testnet (Holesky) = Network: holesky
-  Network: holesky
-  
-  ValidatorOptions:
-    # Whether to enable MEV block production. Requires the connected Beacon node to be MEV-enabled.
-    BuilderProposals: true
-
-eth2:
-  # HTTP URL of the Beacon node to connect to.
-  BeaconNodeAddr: http://lighthouse:5052
-
-eth1:
-  # WebSocket URL of the Eth1 node to connect to.
-  ETH1Addr: ws://nethermind:8545
-
-p2p:
-  # Optionally provide the external IP address of the node, if it cannot be automatically determined.
-  # HostAddress: 192.168.1.1
-
-  # Optionally override the default TCP & UDP ports of the node.
-  TcpPort: 12001
-  UdpPort: 12001
-
-KeyStore:
-  PrivateKeyFile: ./encrypted_private_key.json
-  PasswordFile: ./password
-
-# This enables monitoring at the specified port, see https://docs.ssv.network/run-a-node/operator-node/maintenance/monitoring
-MetricsAPIPort: 15000
-SSVAPIPort: 16000
+  # The nuber of files to keep when rotating logs 
+  LogFileBackups: 14

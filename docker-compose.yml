@@ -8,7 +8,6 @@ x-logging: &logging
 
 services:
   nethermind:
-    container_name: nethermind
     image: nethermind/nethermind:${NETHERMIND_VERSION:-latest}
     restart: "${RESTART:-unless-stopped}"
     ports:
@@ -37,7 +36,6 @@ services:
     <<: *logging
 
   lighthouse:
-    container_name: lighthouse
     image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-latest}
     restart: "${RESTART:-unless-stopped}"
     ports:
@@ -48,7 +46,7 @@ services:
       --port=${LIGHTHOUSE_PORT_P2P:-9000}
       --network=${NETWORK:-holesky}
       --checkpoint-sync-url=${LIGHTHOUSE_CHECKPOINT_SYNC_URL:-https://checkpoint-sync.holesky.ethpandaops.io}
-      --execution-endpoint=http://nethermind:8551
+      --execution-endpoint=${EL_CLIENT:-http://nethermind:8551}
       --execution-jwt=/opt/jwt/jwt.hex
       --datadir=/opt/app/beacon/
       --builder=http://mev-boost:18550
@@ -67,7 +65,6 @@ services:
     <<: *logging
   
   mev-boost:
-    container_name: mev-boost
     restart: "${RESTART:-unless-stopped}"
     image: flashbots/mev-boost:${MEVBOOST_VERSION:-latest}
     networks:
@@ -81,28 +78,59 @@ services:
     <<: *logging
 
   ssv-node:
-    container_name: ssv-node
     image: bloxstaking/ssv-node:${SSV_NODE_VERSION_TAG:-latest}
     restart: "${RESTART:-unless-stopped}"
     command: |
-      make BUILD_PATH=/go/bin/ssvnode start-node
+      /go/bin/ssvnode start-node --config /config.yaml
     volumes:
       - ./config/config.yaml:/config.yaml
       - ./secrets/password:/password
       - ./secrets/encrypted_private_key.json:/encrypted_private_key.json
+      - ./ssv-log:/log
       - /etc/localtime:/etc/localtime:ro
       - ssv-data:/data
     ports:
-      - ${SSV_P2P_PORT:-12001}:${SSV_P2P_PORT:-12001}/tcp
-      - ${SSV_P2P_PORT_UDP:-12001}:${SSV_P2P_PORT_UDP:-12001}/udp
+      - ${SSV_NODE_P2P_PORT:-12001}:${SSV_NODE_P2P_PORT:-12001}/tcp
+      - ${SSV_NODE_P2P_PORT_UDP:-12001}:${SSV_NODE_P2P_PORT_UDP:-12001}/udp
     networks:
       - net
-    <<: *logging
     environment:
-      - CONFIG_PATH=/config.yaml
+      - NETWORK=${NETWORK:-holesky}
+      - DB_PATH=./data/db
+      - PRIVATE_KEY_FILE=./encrypted_private_key.json
+      - PASSWORD_FILE=./password
+      - TCP_PORT=${SSV_NODE_P2P_PORT:-12001}
+      - UDP_PORT=${SSV_NODE_P2P_PORT_UDP:-12001}
+      - METRICS_API_PORT=15000
+      - SSV_API_PORT=16000
+      - ETH_1_ADDR=${EL_CLIENT:-ws://nethermind:8545}
+      - BEACON_NODE_ADDR=${CL_CLIENT:-http://lighthouse:5052}
+      - BUILDER_PROPOSALS=true
+    <<: *logging
+
+  ssv-dkg:
+    restart: "${RESTART:-unless-stopped}"
+    image: bloxstaking/ssv-dkg:${SSV_DKG_VERSION_TAG:-latest}
+    command: |
+      start-operator 
+      --operatorID ${SSV_OPERATOR_ID} 
+      --port ${SSV_DKG_PORT:-3030}
+      --privKey /encrypted_private_key.json 
+      --privKeyPassword /password 
+      --outputPath /output
+      --logFilePath /log/debug.log 
+    volumes:
+      - ./secrets/password:/password
+      - ./secrets/encrypted_private_key.json:/encrypted_private_key.json
+      - ./dkg-output:/output
+      - ./dkg-log:/log
+    ports:
+      - ${SSV_DKG_PORT:-3030}:${SSV_DKG_PORT:-3030}/tcp
+    networks:
+      - dkg-net
+    <<: *logging
 
   prometheus:
-    container_name: prometheus
     restart: "${RESTART:-unless-stopped}"
     image: prom/prometheus:${RPOMETHEUS_VERSION_TAG:-latest}
     volumes:
@@ -112,7 +140,6 @@ services:
     <<: *logging
 
   grafana:
-    container_name: grafana
     restart: "${RESTART:-unless-stopped}"
     image: grafana/grafana:${GRAFANA_VERSION:-10.0.3}
     user: ":"
@@ -130,8 +157,12 @@ services:
 
 volumes:
   ssv-data:
+
 networks:
   net:
     name: ssv-net
+    driver: bridge
+  dkg-net:
+    name: ssv-dkg-net
     driver: bridge
 
