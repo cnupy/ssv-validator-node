@@ -78,7 +78,7 @@ services:
     <<: *logging
 
   ssv-node:
-    image: bloxstaking/ssv-node:${SSV_NODE_VERSION_TAG:-latest}
+    image: bloxstaking/ssv-node:${SSV_NODE_VERSION:-latest}
     restart: "${RESTART:-unless-stopped}"
     command: |
       /go/bin/ssvnode start-node --config /config.yaml
@@ -105,12 +105,12 @@ services:
       - SSV_API_PORT=16000
       - ETH_1_ADDR=${EL_CLIENT:-ws://nethermind:8545}
       - BEACON_NODE_ADDR=${CL_CLIENT:-http://lighthouse:5052}
-      - BUILDER_PROPOSALS=true
+      - BUILDER_PROPOSALS=${BUILDER_API_ENABLED:-true}
     <<: *logging
 
   ssv-dkg:
     restart: "${RESTART:-unless-stopped}"
-    image: bloxstaking/ssv-dkg:${SSV_DKG_VERSION_TAG:-latest}
+    image: bloxstaking/ssv-dkg:${SSV_DKG_VERSION:-latest}
     command: |
       start-operator 
       --operatorID ${SSV_OPERATOR_ID} 
